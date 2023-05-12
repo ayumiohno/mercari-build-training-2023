@@ -5,11 +5,12 @@ from fastapi import FastAPI, Form, HTTPException, UploadFile
 from fastapi.responses import FileResponse
 from fastapi.middleware.cors import CORSMiddleware
 import hashlib
-import os
-import sqlite3
+from pathlib import Path
+from db import SqliteItemsRepository
 
 
 app = FastAPI()
+db = SqliteItemsRepository()
 logger = logging.getLogger("uvicorn")
 logger.level = logging.DEBUG
 images = pathlib.Path(__file__).parent.resolve() / "images"
@@ -23,84 +24,11 @@ app.add_middleware(
 )
 
 
-def convertItemList2Json(list):
-    res = {"items": []}
-    for (category, name, filename) in list:
-        res["items"].append(
-            {"name": name, "category": category, "image_filename": filename})
-    return res
-
-
-def getItems():
-    try:
-        con = sqlite3.connect("../db/mercari.sqlite3")
-        cur = con.cursor()
-        cur.execute(
-            """SELECT categories.name, items.name, items.image_name FROM items 
-                JOIN categories ON items.category_id = categories.id;""")
-        return convertItemList2Json(cur.fetchall())
-    except sqlite3.Error as err:
-        logger.debug(err)
-        return {}
-
-
-def getItemsById(id):
-    try:
-        con = sqlite3.connect("../db/mercari.sqlite3")
-        cur = con.cursor()
-        cur.execute(
-            """SELECT categories.name, items.name, items.image_name FROM items 
-                    JOIN categories ON items.category_id = categories.id WHERE items.id = ?;""", id)
-        return convertItemList2Json(cur.fetchall())
-    except sqlite3.Error as err:
-        logger.debug(err)
-        return {}
-
-
-def saveItems(name, category, filename):
-    try:
-        con = sqlite3.connect("../db/mercari.sqlite3")
-        cur = con.cursor()
-        cur.execute("""SELECT id from categories where name = ?""", (category,))
-        category_id = -1
-        res = cur.fetchall()
-        if len(res) >= 1:
-            category_id = res[0][0]
-        else:
-            cur.execute(
-                """INSERT INTO categories (name) VALUES(?) RETURNING id;""", (category,))
-            category_id = cur.fetchall()[0][0]
-        cur.execute(
-            """INSERT INTO items (name, category_id, image_name) VALUES(?,?,?);""",
-            (name, category_id, filename,))
-        con.commit()
-    except sqlite3.Error as err:
-        logger.debug(err)
-        return {}
-
-
-def searchItems(keyword):
-    try:
-        con = sqlite3.connect("../db/mercari.sqlite3")
-        cur = con.cursor()
-        cur.execute(
-            """SELECT categories.name, items.name, items.image_name FROM items 
-                    JOIN categories ON items.category_id = categories.id
-                    WHERE items.name LIKE ?""", (f'%{keyword}%',))
-        return convertItemList2Json(cur.fetchall())
-    except sqlite3.Error as err:
-        logger.debug(err)
-        return {}
-
-
-def saveFile(image: UploadFile):
-    extension = os.path.splitext(
-        image.filename)[-1] if image.filename else '.png'
+def save_file(image: UploadFile) -> str:
+    extension = Path(image.filename).suffix if image.filename else '.png'
     content = image.file.read()
     sha256 = hashlib.sha256(content)
-    with open(f'images/{sha256.hexdigest()}{extension}', 'w+b') as outfile:
-        outfile.write(content)
-        outfile.close()
+    Path(f'images/{sha256.hexdigest()}{extension}').write_bytes(content)
     return sha256.hexdigest()
 
 
@@ -111,25 +39,25 @@ def root():
 
 @ app.get("/items")
 def get_items():
-    return getItems()
+    return db.get_items()
 
 
 @ app.get("/search")
 def search_items(keyword: str = Form(...)):
-    return searchItems(keyword)
+    return db.search_items_by_name(keyword)
 
 
 @ app.post("/items")
 def add_item(name: str = Form(...), category: str = Form(...), image: UploadFile = Form(...)):
     logger.info(f"Receive item: {name} {category}")
-    filename = saveFile(image)
-    saveItems(name, category, filename)
+    filename = save_file(image)
+    db.add_items(name, category, filename)
     return {"message": f"item received: {name}"}
 
 
 @ app.get("/items/{item_id}")
 async def get_item(item_id):
-    return getItemsById(item_id)
+    return db.get_item_by_id(item_id)
 
 
 @ app.get("/image/{image_filename}")
