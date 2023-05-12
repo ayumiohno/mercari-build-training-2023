@@ -4,9 +4,10 @@ import pathlib
 from fastapi import FastAPI, Form, HTTPException, UploadFile
 from fastapi.responses import FileResponse
 from fastapi.middleware.cors import CORSMiddleware
-import json
 import hashlib
 import os
+import sqlite3
+
 
 app = FastAPI()
 logger = logging.getLogger("uvicorn")
@@ -22,28 +23,74 @@ app.add_middleware(
 )
 
 
+def convertItemList2Json(list):
+    res = {"items": []}
+    for (category, name, filename) in list:
+        res["items"].append(
+            {"name": name, "category": category, "image_filename": filename})
+    return res
+
+
 def getItems():
     try:
-        with open('./item.json', mode='r', encoding="utf-8") as f:
-            return json.load(f, strict=False)
-    except json.decoder.JSONDecodeError:  # json形式でない場合
+        con = sqlite3.connect("../db/mercari.sqlite3")
+        cur = con.cursor()
+        cur.execute(
+            """SELECT categories.name, items.name, items.image_name FROM items 
+                JOIN categories ON items.category_id = categories.id;""")
+        return convertItemList2Json(cur.fetchall())
+    except sqlite3.Error as err:
+        logger.debug(err)
         return {}
-    except FileNotFoundError:  # ファイルがない場合
+
+
+def getItemsById(id):
+    try:
+        con = sqlite3.connect("../db/mercari.sqlite3")
+        cur = con.cursor()
+        cur.execute(
+            """SELECT categories.name, items.name, items.image_name FROM items 
+                    JOIN categories ON items.category_id = categories.id WHERE items.id = ?;""", id)
+        return convertItemList2Json(cur.fetchall())
+    except sqlite3.Error as err:
+        logger.debug(err)
         return {}
 
 
 def saveItems(name, category, filename):
     try:
-        with open('./item.json', mode='r', encoding="utf-8") as f:
-            data = json.load(f, strict=False)
-    except json.decoder.JSONDecodeError:  # json形式でない場合
-        data = {"items": []}
-    except FileNotFoundError:  # ファイルがない場合
-        data = {"items": []}
-    with open('./item.json', mode='w', encoding="utf-8") as f:
-        data["items"].append(
-            {"name": name, "category": category, "image_filename": filename})
-        json.dump(data, f)
+        con = sqlite3.connect("../db/mercari.sqlite3")
+        cur = con.cursor()
+        cur.execute("""SELECT id from categories where name = ?""", (category,))
+        category_id = -1
+        res = cur.fetchall()
+        if len(res) >= 1:
+            category_id = res[0][0]
+        else:
+            cur.execute(
+                """INSERT INTO categories (name) VALUES(?) RETURNING id;""", (category,))
+            category_id = cur.fetchall()[0][0]
+        cur.execute(
+            """INSERT INTO items (name, category_id, image_name) VALUES(?,?,?);""",
+            (name, category_id, filename,))
+        con.commit()
+    except sqlite3.Error as err:
+        logger.debug(err)
+        return {}
+
+
+def searchItems(keyword):
+    try:
+        con = sqlite3.connect("../db/mercari.sqlite3")
+        cur = con.cursor()
+        cur.execute(
+            """SELECT categories.name, items.name, items.image_name FROM items 
+                    JOIN categories ON items.category_id = categories.id
+                    WHERE items.name LIKE ?""", (f'%{keyword}%',))
+        return convertItemList2Json(cur.fetchall())
+    except sqlite3.Error as err:
+        logger.debug(err)
+        return {}
 
 
 def saveFile(image: UploadFile):
@@ -57,17 +104,22 @@ def saveFile(image: UploadFile):
     return sha256.hexdigest()
 
 
-@app.get("/")
+@ app.get("/")
 def root():
     return {"message": "Hello, world!"}
 
 
-@app.get("/items")
+@ app.get("/items")
 def get_items():
     return getItems()
 
 
-@app.post("/items")
+@ app.get("/search")
+def search_items(keyword: str = Form(...)):
+    return searchItems(keyword)
+
+
+@ app.post("/items")
 def add_item(name: str = Form(...), category: str = Form(...), image: UploadFile = Form(...)):
     logger.info(f"Receive item: {name} {category}")
     filename = saveFile(image)
@@ -75,22 +127,12 @@ def add_item(name: str = Form(...), category: str = Form(...), image: UploadFile
     return {"message": f"item received: {name}"}
 
 
-@app.get("/items/{item_id}")
+@ app.get("/items/{item_id}")
 async def get_item(item_id):
-    try:
-        with open('./item.json', mode='r', encoding="utf-8") as f:
-            item_id = int(item_id)
-            data = json.load(f, strict=False)
-            if (len(data["items"]) < item_id or item_id < 0):  # indexが範囲外のとき
-                logger.debug(f"Item not found: {item_id}")
-                return {"message": "Item Not found"}
-            return data["items"][item_id - 1]
-    except ValueError as err:
-        logger.debug(err)
-        return {"message": "Error"}
+    return getItemsById(item_id)
 
 
-@app.get("/image/{image_filename}")
+@ app.get("/image/{image_filename}")
 async def get_image(image_filename):
     # Create image path
     image = images / image_filename
