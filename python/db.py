@@ -8,6 +8,8 @@ from pydantic.types import OptionalInt
 logger = logging.getLogger("uvicorn")
 logger.level = logging.DEBUG
 
+db_path = "mercari.sqlite3"
+
 
 class CategoriesRepository(metaclass=ABCMeta):
     @abstractmethod
@@ -43,7 +45,7 @@ class ItemsRepository(metaclass=ABCMeta):
 class SqliteCategoriesRepository(CategoriesRepository):
     def get_id_by_name(self, name) -> OptionalInt:
         try:
-            con = sqlite3.connect("../db/mercari.sqlite3")
+            con = sqlite3.connect(db_path)
             cur = con.cursor()
             cur.execute(
                 """SELECT id from categories where name = ?""", (name,))
@@ -59,7 +61,7 @@ class SqliteCategoriesRepository(CategoriesRepository):
 
     def add_category(self, name) -> OptionalInt:
         try:
-            con = sqlite3.connect("../db/mercari.sqlite3")
+            con = sqlite3.connect(db_path)
             cur = con.cursor()
             cur.execute(
                 """INSERT INTO categories (name) VALUES(?) RETURNING id;""", (name,))
@@ -85,7 +87,7 @@ class SqliteItemsRepository(ItemsRepository):
     def get_items(self) -> dict:
         try:
             print("called")
-            con = sqlite3.connect("../db/mercari.sqlite3")
+            con = sqlite3.connect(db_path)
             cur = con.cursor()
             cur.execute(
                 """SELECT categories.name, items.name, items.image_name FROM items
@@ -99,7 +101,7 @@ class SqliteItemsRepository(ItemsRepository):
 
     def get_item_by_id(self, id) -> dict:
         try:
-            con = sqlite3.connect("../db/mercari.sqlite3")
+            con = sqlite3.connect(db_path)
             cur = con.cursor()
             cur.execute(
                 """SELECT categories.name, items.name, items.image_name FROM items
@@ -120,7 +122,7 @@ class SqliteItemsRepository(ItemsRepository):
             if not category_id:
                 logger.debug("err")
                 return {}
-            con = sqlite3.connect("../db/mercari.sqlite3")
+            con = sqlite3.connect(db_path)
             cur = con.cursor()
             cur.execute(
                 """INSERT INTO items (name, category_id, image_name) VALUES(?,?,?);""",
@@ -133,7 +135,7 @@ class SqliteItemsRepository(ItemsRepository):
 
     def search_items_by_name(self, keyword):
         try:
-            con = sqlite3.connect("../db/mercari.sqlite3")
+            con = sqlite3.connect(db_path)
             cur = con.cursor()
             cur.execute(
                 """SELECT categories.name, items.name, items.image_name FROM items

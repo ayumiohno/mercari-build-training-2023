@@ -5,7 +5,9 @@ from fastapi import FastAPI, Form, HTTPException, UploadFile
 from fastapi.responses import FileResponse
 from fastapi.middleware.cors import CORSMiddleware
 import hashlib
+from typing import Optional
 from pathlib import Path
+
 from db import SqliteItemsRepository
 
 
@@ -24,12 +26,19 @@ app.add_middleware(
 )
 
 
-def save_file(image: UploadFile) -> str:
+def save_file(image: UploadFile) -> Optional[str]:
     extension = Path(image.filename).suffix if image.filename else '.png'
-    content = image.file.read()
-    sha256 = hashlib.sha256(content)
-    Path(f'images/{sha256.hexdigest()}{extension}').write_bytes(content)
-    return sha256.hexdigest()
+    try:
+        content = image.file.read()
+        sha256 = hashlib.sha256(content)
+        Path(f'images/{sha256.hexdigest()}{extension}').write_bytes(content)
+        return sha256.hexdigest()
+    except PermissionError as err:
+        logger.debug(err)
+        return None
+    except FileNotFoundError as err:
+        logger.debug(err)
+        return None
 
 
 @ app.get("/")
@@ -51,6 +60,9 @@ def search_items(keyword: str = Form(...)):
 def add_item(name: str = Form(...), category: str = Form(...), image: UploadFile = Form(...)):
     logger.info(f"Receive item: {name} {category}")
     filename = save_file(image)
+    if filename is None:
+        raise HTTPException(
+            status_code=400, detail="Failed to save file")
     db.add_items(name, category, filename)
     return {"message": f"item received: {name}"}
 
