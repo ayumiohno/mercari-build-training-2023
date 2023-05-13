@@ -81,9 +81,9 @@ class SqliteItemsRepository(ItemsRepository):
 
     def __convert_item_list_to_dict(self, list):
         res = {"items": []}
-        for (category, name, filename) in list:
+        for (id, category, name, filename) in list:
             res["items"].append(
-                {"name": name, "category": category, "image_filename": filename})
+                {"id": id, "name": name, "category": category, "image_filename": filename})
         return res
 
     def get_items(self) -> dict:
@@ -91,7 +91,7 @@ class SqliteItemsRepository(ItemsRepository):
             con = sqlite3.connect(db_path)
             cur = con.cursor()
             cur.execute(
-                """SELECT categories.name, items.name, items.image_name FROM items
+                """SELECT items.id, categories.name, items.name, items.image_name FROM items
                 JOIN categories ON items.category_id = categories.id;""")
             res = self.__convert_item_list_to_dict(cur.fetchall())
             con.close()
@@ -105,7 +105,7 @@ class SqliteItemsRepository(ItemsRepository):
             con = sqlite3.connect(db_path)
             cur = con.cursor()
             cur.execute(
-                """SELECT categories.name, items.name, items.image_name FROM items
+                """SELECT items.id, categories.name, items.name, items.image_name FROM items
                     JOIN categories ON items.category_id = categories.id WHERE items.id = ?;""", id)
             res = self.__convert_item_list_to_dict(cur.fetchall())
             con.close()
@@ -139,7 +139,7 @@ class SqliteItemsRepository(ItemsRepository):
             con = sqlite3.connect(db_path)
             cur = con.cursor()
             cur.execute(
-                """SELECT categories.name, items.name, items.image_name FROM items
+                """SELECT items.id, categories.name, items.name, items.image_name FROM items
                     JOIN categories ON items.category_id = categories.id
                     WHERE items.name LIKE ?""", (f'%{keyword}%',))
             res = self.__convert_item_list_to_dict(cur.fetchall())
