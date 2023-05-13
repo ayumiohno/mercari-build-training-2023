@@ -51,8 +51,8 @@ def get_items():
     return db.get_items()
 
 
-@ app.get("/search")
-def search_items(keyword: str = Form(...)):
+@ app.get("/search/")
+def search_items(keyword: str):
     return db.search_items_by_name(keyword)
 
 
