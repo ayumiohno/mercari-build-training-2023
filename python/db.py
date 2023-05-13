@@ -8,7 +8,7 @@ from pydantic.types import OptionalInt
 logger = logging.getLogger("uvicorn")
 logger.level = logging.DEBUG
 
-db_path = "mercari.sqlite3"
+db_path = "../db/mercari.sqlite3"
 
 
 class CategoriesRepository(metaclass=ABCMeta):
@@ -86,7 +86,6 @@ class SqliteItemsRepository(ItemsRepository):
 
     def get_items(self) -> dict:
         try:
-            print("called")
             con = sqlite3.connect(db_path)
             cur = con.cursor()
             cur.execute(
