@@ -46,12 +46,13 @@ export const ItemList: React.FC<Prop> = (props) => {
   }, [reload]);
 
   return (
-    <div>
-      {items.map((item) => {
+    <div className='ItemList'>
+			<div className='Grid'>
+			{items.map((item) => {
         return (
-          <div key={item.id} className='ItemList'>
+          <div key={item.id} className='Item'>
             {/* TODO: Task 1: Replace the placeholder image with the item image */}
-            <img src={placeholderImage} />
+            <img src={`http://localhost:9000/image/${item.image_filename}.jpg`} alt={placeholderImage} />
             <p>
               <span>Name: {item.name}</span>
               <br />
@@ -60,6 +61,7 @@ export const ItemList: React.FC<Prop> = (props) => {
           </div>
         )
       })}
+			</div>
     </div>
   )
 };

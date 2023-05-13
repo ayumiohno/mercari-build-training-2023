@@ -24,8 +24,7 @@
   color: white;
 }
 
-.ItemList {
-  background-color: #222427;
+.Item {
   min-height: 8vh;
   display: flex;
   flex-direction: column;
@@ -33,6 +32,16 @@
   justify-content: left;
   font-size: calc(10px + 1vmin);
   color: white;
+}
+
+.ItemList {
+  background-color: #222427;
+	height : 100vh;
+}
+
+.Grid {
+	display: grid;
+	grid-template-columns: 1fr 1fr 1fr;
 }
 
 .App-link {
