@@ -65,9 +65,11 @@ class SqliteCategoriesRepository(CategoriesRepository):
             cur = con.cursor()
             cur.execute(
                 """INSERT INTO categories (name) VALUES(?) RETURNING id;""", (name,))
+            res = cur.fetchall()[0][0]
             con.commit()
             con.close()
-            return cur.fetchall()[0][0]
+            return res
+
         except sqlite3.Error as err:
             logger.debug(err)
             return None
